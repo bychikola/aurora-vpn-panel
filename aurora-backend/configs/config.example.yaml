@@ -1,0 +1,41 @@
+# AURORA VPN Panel — Configuration
+# Copy to config.yaml and adjust for your environment
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  readTimeout: "15s"
+  writeTimeout: "30s"
+  idleTimeout: "60s"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "aurora"
+  password: "change-me"
+  dbname: "aurora"
+  sslmode: "disable"
+  maxConns: 25
+  minConns: 5
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  poolSize: 20
+
+jwt:
+  accessSecret: "change-me-access-secret-at-least-32-chars"
+  refreshSecret: "change-me-refresh-secret-at-least-32-chars"
+  accessTTL: "15m"
+  refreshTTL: "168h"  # 7 days
+
+xray:
+  grpcTimeout: "10s"
+  retryMax: 3
+  retryWait: "2s"
+
+log:
+  level: "info"
+  format: "json"  # json | console
