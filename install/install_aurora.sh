@@ -260,6 +260,20 @@ generate_hex32() {
 }
 
 # ═══════════════════════════════════════════════
+# Webserver selection
+# ═══════════════════════════════════════════════
+
+show_webserver_select() {
+    echo -e ""
+    echo -e "${COLOR_GREEN}Select reverse proxy:${COLOR_RESET}"
+    echo -e ""
+    echo -e "  ${COLOR_YELLOW}1.${COLOR_RESET} Nginx + Let's Encrypt (certbot)"
+    echo -e "  ${COLOR_YELLOW}2.${COLOR_RESET} Caddy (automatic SSL, no certbot needed)"
+    echo -e ""
+    reading "Select (1-2): " WEBSERVER_CHOICE
+}
+
+# ═══════════════════════════════════════════════
 # Domain + SSL helpers
 # ═══════════════════════════════════════════════
 
@@ -295,50 +309,88 @@ obtain_ssl() {
     local domain="$1"; local email="$2"
 
     info "Obtaining SSL certificate for $domain..."
-    reading "Use Cloudflare DNS API? (y/n): " use_cf
 
-    if [[ "$use_cf" == "y" || "$use_cf" == "Y" ]]; then
-        reading "Enter Cloudflare API token (or global key): " CF_API_KEY
-        reading "Enter Cloudflare email: " CF_EMAIL
+    # Check if port 80 is reachable
+    local port80_ok=false
+    if nc -z -w3 "$(curl -s4 ifconfig.me)" 80 2>/dev/null; then
+        port80_ok=true
+    fi
 
-        mkdir -p ~/.secrets/certbot
-        if [[ "$CF_API_KEY" =~ [A-Z] ]]; then
-            cat > ~/.secrets/certbot/cloudflare.ini <<EOF
+    echo -e ""
+    echo -e "${COLOR_GREEN}SSL Certificate Options:${COLOR_RESET}"
+    echo -e ""
+    echo -e "  ${COLOR_YELLOW}1.${COLOR_RESET} Cloudflare DNS API (recommended, works without port 80)"
+    echo -e "  ${COLOR_YELLOW}2.${COLOR_RESET} Let's Encrypt HTTP challenge (requires open port 80)"
+
+    if [ "$port80_ok" = false ]; then
+        warning "Port 80 is CLOSED on this server. Option 2 will fail."
+        warning "Use option 1 (Cloudflare DNS) or open port 80 in firewall."
+    fi
+    echo -e ""
+    reading "Select SSL method (1-2): " SSL_METHOD
+
+    case $SSL_METHOD in
+        1)
+            reading "Enter Cloudflare API token: " CF_API_KEY
+            reading "Enter Cloudflare email: " CF_EMAIL
+
+            mkdir -p ~/.secrets/certbot
+            if [[ "$CF_API_KEY" =~ [A-Z] ]]; then
+                cat > ~/.secrets/certbot/cloudflare.ini <<EOF
 dns_cloudflare_api_token = $CF_API_KEY
 EOF
-        else
-            cat > ~/.secrets/certbot/cloudflare.ini <<EOF
+            else
+                cat > ~/.secrets/certbot/cloudflare.ini <<EOF
 dns_cloudflare_email = $CF_EMAIL
 dns_cloudflare_api_key = $CF_API_KEY
 EOF
-        fi
-        chmod 600 ~/.secrets/certbot/cloudflare.ini
+            fi
+            chmod 600 ~/.secrets/certbot/cloudflare.ini
 
-        local base_domain=$(extract_domain "$domain")
-        certbot certonly --dns-cloudflare \
-            --dns-cloudflare-credentials ~/.secrets/certbot/cloudflare.ini \
-            --dns-cloudflare-propagation-seconds 60 \
-            -d "$base_domain" -d "*.$base_domain" \
-            --email "$email" --agree-tos --non-interactive \
-            --key-type ecdsa --elliptic-curve secp384r1 2>&1 &
-    else
-        ufw allow 80/tcp comment 'HTTP ACME' >/dev/null 2>&1
-        certbot certonly --standalone \
-            -d "$domain" \
-            --email "$email" --agree-tos --non-interactive \
-            --http-01-port 80 \
-            --key-type ecdsa --elliptic-curve secp384r1 2>&1 &
-        ufw delete allow 80/tcp >/dev/null 2>&1
-    fi
+            local base_domain=$(extract_domain "$domain")
+            certbot certonly --dns-cloudflare \
+                --dns-cloudflare-credentials ~/.secrets/certbot/cloudflare.ini \
+                --dns-cloudflare-propagation-seconds 80 \
+                -d "$base_domain" -d "*.$base_domain" \
+                --email "$email" --agree-tos --non-interactive \
+                --key-type ecdsa --elliptic-curve secp384r1 > /tmp/certbot.log 2>&1 &
+            ;;
+        2)
+            ufw allow 80/tcp comment 'HTTP ACME' >/dev/null 2>&1
+            certbot certonly --standalone \
+                -d "$domain" \
+                --email "$email" --agree-tos --non-interactive \
+                --http-01-port 80 \
+                --key-type ecdsa --elliptic-curve secp384r1 > /tmp/certbot.log 2>&1 &
+            ufw delete allow 80/tcp >/dev/null 2>&1
+            ;;
+        *)
+            warning "Invalid choice, using Cloudflare DNS"
+            reading "Enter Cloudflare API token: " CF_API_KEY
+            reading "Enter Cloudflare email: " CF_EMAIL
+            mkdir -p ~/.secrets/certbot
+            cat > ~/.secrets/certbot/cloudflare.ini <<EOF
+dns_cloudflare_api_key = $CF_API_KEY
+EOF
+            chmod 600 ~/.secrets/certbot/cloudflare.ini
+            certbot certonly --dns-cloudflare \
+                --dns-cloudflare-credentials ~/.secrets/certbot/cloudflare.ini \
+                --dns-cloudflare-propagation-seconds 80 \
+                -d "$(extract_domain "$domain")" -d "*.$(extract_domain "$domain")" \
+                --email "$email" --agree-tos --non-interactive \
+                --key-type ecdsa --elliptic-curve secp384r1 > /tmp/certbot.log 2>&1 &
+            ;;
+    esac
 
     spinner $! "Obtaining SSL certificate..."
     wait $!
 
-    if [ -d "/etc/letsencrypt/live/$domain" ]; then
-        success "SSL certificate obtained for $domain"
+    if [ -d "/etc/letsencrypt/live/$domain" ] || [ -d "/etc/letsencrypt/live/$(extract_domain "$domain")" ]; then
+        success "SSL certificate obtained"
         return 0
     else
-        error "Failed to obtain SSL certificate"
+        echo -e ""
+        error "SSL failed. Check /tmp/certbot.log for details."
     fi
 }
 
@@ -418,8 +470,24 @@ install_aurora_panel_node() {
 
     reading "${LANG[ENTER_DOMAIN]}" PANEL_DOMAIN
     check_domain "$PANEL_DOMAIN" || return 0
-    reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
-    obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+
+    show_webserver_select
+    case $WEBSERVER_CHOICE in
+        1)
+            reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
+            obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+            USE_WEBSERVER="nginx"
+            ;;
+        2)
+            USE_WEBSERVER="caddy"
+            info "Caddy will obtain SSL certificates automatically."
+            ;;
+        *)
+            USE_WEBSERVER="nginx"
+            reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
+            obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+            ;;
+    esac
 
     DB_PASSWORD=$(generate_password 24)
     JWT_ACCESS=$(generate_hex32)
@@ -428,7 +496,7 @@ install_aurora_panel_node() {
 
     info "${LANG[GENERATING_CONFIG]}"
     # Call panel installation function from loaded module
-    _do_install_panel "$PANEL_DOMAIN" "$DB_PASSWORD" "$JWT_ACCESS" "$JWT_REFRESH" "$ADMIN_PASSWORD"
+    _do_install_panel "$PANEL_DOMAIN" "$DB_PASSWORD" "$JWT_ACCESS" "$JWT_REFRESH" "$ADMIN_PASSWORD" "$USE_WEBSERVER"
 
     info "Installing node alongside panel..."
     _do_install_node "localhost" "10085" "localhost"
@@ -457,8 +525,24 @@ install_aurora_panel() {
 
     reading "${LANG[ENTER_DOMAIN]}" PANEL_DOMAIN
     check_domain "$PANEL_DOMAIN" || return 0
-    reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
-    obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+
+    show_webserver_select
+    case $WEBSERVER_CHOICE in
+        1)
+            reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
+            obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+            USE_WEBSERVER="nginx"
+            ;;
+        2)
+            USE_WEBSERVER="caddy"
+            info "Caddy will obtain SSL certificates automatically."
+            ;;
+        *)
+            USE_WEBSERVER="nginx"
+            reading "${LANG[ENTER_EMAIL]}" LETSENCRYPT_EMAIL
+            obtain_ssl "$PANEL_DOMAIN" "$LETSENCRYPT_EMAIL"
+            ;;
+    esac
 
     DB_PASSWORD=$(generate_password 24)
     JWT_ACCESS=$(generate_hex32)
@@ -466,7 +550,7 @@ install_aurora_panel() {
     ADMIN_PASSWORD=$(generate_password 16)
 
     info "${LANG[GENERATING_CONFIG]}"
-    _do_install_panel "$PANEL_DOMAIN" "$DB_PASSWORD" "$JWT_ACCESS" "$JWT_REFRESH" "$ADMIN_PASSWORD"
+    _do_install_panel "$PANEL_DOMAIN" "$DB_PASSWORD" "$JWT_ACCESS" "$JWT_REFRESH" "$ADMIN_PASSWORD" "$USE_WEBSERVER"
 
     info "${LANG[STARTING_SERVICES]}"
     cd /opt/aurora && docker compose up -d 2>&1 &

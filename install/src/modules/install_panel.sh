@@ -7,6 +7,7 @@ _do_install_panel() {
     local JWT_ACCESS="$3"
     local JWT_REFRESH="$4"
     local ADMIN_PASSWORD="$5"
+    local WEBSERVER="${6:-nginx}"  # nginx or caddy
 
     mkdir -p /opt/aurora/{configs,data/postgres,data/redis,ssl}
 
@@ -70,8 +71,21 @@ log:
   format: "json"
 EOF
 
-    # Docker-compose for panel
-    cat > /opt/aurora/docker-compose.yml <<'YAML'
+    # Copy SSL certificates (for Nginx mode)
+    if [ "$WEBSERVER" = "nginx" ]; then
+        local cert_dir="/etc/letsencrypt/live/${PANEL_DOMAIN}"
+        local base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+        if [ ! -d "$cert_dir" ]; then
+            cert_dir="/etc/letsencrypt/live/${base_domain}"
+        fi
+        if [ -d "$cert_dir" ]; then
+            cp "$cert_dir/fullchain.pem" /opt/aurora/ssl/fullchain.pem
+            cp "$cert_dir/privkey.pem" /opt/aurora/ssl/privkey.pem
+        fi
+    fi
+
+    # ─── Docker-compose ───
+    cat > /opt/aurora/docker-compose.yml <<YAML
 services:
   postgres:
     image: postgres:16-alpine
@@ -80,7 +94,7 @@ services:
     environment:
       POSTGRES_DB: aurora
       POSTGRES_USER: aurora
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: \${DB_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     ports:
@@ -139,6 +153,45 @@ services:
     networks:
       - aurora-net
 
+YAML
+
+    # ─── Reverse proxy: Caddy or Nginx ───
+    if [ "$WEBSERVER" = "caddy" ]; then
+        cat >> /opt/aurora/docker-compose.yml <<YAML
+  caddy:
+    image: caddy:2-alpine
+    container_name: aurora-caddy
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - aurora-net
+YAML
+
+        cat > /opt/aurora/Caddyfile <<EOF
+${PANEL_DOMAIN} {
+    encode gzip zstd
+    handle /api/* {
+        reverse_proxy backend:8080
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+EOF
+        info "Caddy configured — auto-SSL will obtain certificate on first request"
+    else
+        # Nginx
+        cat >> /opt/aurora/docker-compose.yml <<YAML
   nginx:
     image: nginx:alpine
     container_name: aurora-nginx
@@ -147,23 +200,25 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     ports:
+      - "80:80"
       - "443:443"
     depends_on:
       - backend
       - frontend
     networks:
       - aurora-net
-
-networks:
-  aurora-net:
-    driver: bridge
 YAML
 
-    # Nginx config
-    cat > /opt/aurora/nginx.conf <<EOF
+        cat > /opt/aurora/nginx.conf <<EOF
 events { worker_connections 1024; }
 
 http {
+    server {
+        listen 80;
+        server_name ${PANEL_DOMAIN};
+        return 301 https://\$host\$request_uri;
+    }
+
     server {
         listen 443 ssl http2;
         server_name ${PANEL_DOMAIN};
@@ -173,34 +228,37 @@ http {
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;
 
-        # Frontend
         location / {
             proxy_pass http://frontend:80;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
         }
 
-        # Backend API
         location /api/ {
             proxy_pass http://backend:8080;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
         }
     }
 }
 EOF
 
-    # Copy SSL certificates
-    if [ -d "/etc/letsencrypt/live/${PANEL_DOMAIN}" ]; then
-        cp /etc/letsencrypt/live/${PANEL_DOMAIN}/fullchain.pem /opt/aurora/ssl/fullchain.pem
-        cp /etc/letsencrypt/live/${PANEL_DOMAIN}/privkey.pem /opt/aurora/ssl/privkey.pem
+        # SSL renewal cron (only for Nginx)
+        local base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+        cat > /etc/cron.d/aurora-ssl <<EOF
+0 3 * * * root certbot renew --quiet --post-hook "cp /etc/letsencrypt/live/${base_domain}/fullchain.pem /opt/aurora/ssl/fullchain.pem && cp /etc/letsencrypt/live/${base_domain}/privkey.pem /opt/aurora/ssl/privkey.pem && cd /opt/aurora && docker compose restart nginx"
+EOF
     fi
 
-    # SSL renewal cron
-    cat > /etc/cron.d/aurora-ssl <<EOF
-0 3 * * * root certbot renew --quiet --post-hook "cp /etc/letsencrypt/live/${PANEL_DOMAIN}/fullchain.pem /opt/aurora/ssl/fullchain.pem && cp /etc/letsencrypt/live/${PANEL_DOMAIN}/privkey.pem /opt/aurora/ssl/privkey.pem && cd /opt/aurora && docker compose restart nginx"
-EOF
+    cat >> /opt/aurora/docker-compose.yml <<YAML
+networks:
+  aurora-net:
+    driver: bridge
+YAML
 
-    success "Panel configuration written to /opt/aurora/"
+    success "Panel configuration written to /opt/aurora/ (webserver: ${WEBSERVER})"
 }
