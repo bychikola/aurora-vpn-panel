@@ -109,21 +109,18 @@ export default function Dashboard() {
           label="Nodes"
           value={`${stats.onlineNodes}/${stats.totalNodes} online`}
           sub={<NodeStatusBar nodes={[{ status: 'online' }, { status: 'online' }, { status: 'degraded' }, { status: 'offline' }]} />}
-          accent="var(--color-aurora-violet)"
         />
         <StatCard
           icon={TrendingDown}
           label="Download"
           value={formatBytes(stats.totalTrafficDown)}
           sub="Total inbound"
-          accent="var(--color-aurora-cyan)"
         />
         <StatCard
           icon={TrendingUp}
           label="Upload"
           value={formatBytes(stats.totalTrafficUp)}
           sub="Total outbound"
-          accent="var(--color-aurora-blue)"
         />
       </div>
 
