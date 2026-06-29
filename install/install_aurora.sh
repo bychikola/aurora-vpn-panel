@@ -44,12 +44,12 @@ declare -gA LANG=(
 # Helpers
 # ═══════════════════════════════════════════════
 
-question() { echo -e "${COLOR_GREEN}[?]${COLOR_RESET} ${COLOR_YELLOW}$*${COLOR_RESET}"; }
-info() { echo -e "${COLOR_CYAN}[i]${COLOR_RESET} ${COLOR_WHITE}$*${COLOR_RESET}"; }
-success() { echo -e "${COLOR_GREEN}[✓]${COLOR_RESET} ${COLOR_GREEN}$*${COLOR_RESET}"; }
-warning() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} ${COLOR_YELLOW}$*${COLOR_RESET}"; }
-error() { echo -e "${COLOR_RED}[✗]${COLOR_RESET} ${COLOR_RED}$*${COLOR_RESET}"; exit 1; }
-reading() { read -rp "$(question "$1")" "$2"; }
+question() { echo -e "${COLOR_GREEN}[?]${COLOR_RESET} ${COLOR_YELLOW}$*${COLOR_RESET}" >&2; }
+info() { echo -e "${COLOR_CYAN}[i]${COLOR_RESET} ${COLOR_WHITE}$*${COLOR_RESET}" >&2; }
+success() { echo -e "${COLOR_GREEN}[✓]${COLOR_RESET} ${COLOR_GREEN}$*${COLOR_RESET}" >&2; }
+warning() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} ${COLOR_YELLOW}$*${COLOR_RESET}" >&2; }
+error() { echo -e "${COLOR_RED}[✗]${COLOR_RESET} ${COLOR_RED}$*${COLOR_RESET}" >&2; exit 1; }
+reading() { read -rp "$(question "$1")" "$2" </dev/tty; }
 
 spinner() {
     local pid=$1; local text=$2
@@ -171,18 +171,21 @@ _set_fallback_en() {
 
 show_language_menu() {
     clear
-    echo -e ""
-    echo -e "${COLOR_CYAN}    ╔══════════════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ║     ${COLOR_WHITE}Unified Installer${COLOR_CYAN}           ║${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ╚══════════════════════════════════╝${COLOR_RESET}"
-    echo -e ""
-    echo -e "${COLOR_GREEN}${LANG[CHOOSE_LANG]}${COLOR_RESET}"
-    echo -e ""
-    echo -e "    ${COLOR_YELLOW}1. ${COLOR_WHITE}English${COLOR_RESET}"
-    echo -e "    ${COLOR_YELLOW}2. ${COLOR_WHITE}Русский${COLOR_RESET}"
-    echo -e ""
+    cat >&2 <<EOF
+
+${COLOR_CYAN}    ╔══════════════════════════════════╗
+    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║
+    ║     ${COLOR_WHITE}Unified Installer${COLOR_CYAN}           ║
+    ╚══════════════════════════════════╝${COLOR_RESET}
+
+${COLOR_GREEN}${LANG[CHOOSE_LANG]}${COLOR_RESET}
+
+    ${COLOR_YELLOW}1. ${COLOR_WHITE}English${COLOR_RESET}
+    ${COLOR_YELLOW}2. ${COLOR_WHITE}Русский${COLOR_RESET}
+
+EOF
     reading "Select (1-2): " LANG_CHOICE
+    echo "$LANG_CHOICE" >&2
 
     case $LANG_CHOICE in
         1) echo "1" > "$LANG_FILE"; set_language en ;;
@@ -370,26 +373,39 @@ load_module() {
 
 show_menu() {
     clear
-    echo -e ""
-    echo -e "${COLOR_CYAN}    ╔══════════════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ║     ${COLOR_WHITE}Unified Installer v${SCRIPT_VERSION}${COLOR_CYAN}   ║${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}    ╚══════════════════════════════════╝${COLOR_RESET}"
-    echo -e ""
-    echo -e "${COLOR_GRAY}github.com/bychikola/aurora-vpn-panel${COLOR_RESET}"
-    echo -e ""
-    echo -e "  ${COLOR_YELLOW}1.${COLOR_RESET} ${LANG[MENU_1]}"
-    echo -e "  ${COLOR_YELLOW}2.${COLOR_RESET} ${LANG[MENU_2]}"
-    echo -e "  ${COLOR_YELLOW}3.${COLOR_RESET} ${LANG[MENU_3]}"
-    echo -e "  ${COLOR_YELLOW}4.${COLOR_RESET} ${LANG[MENU_4]}"
-    echo -e "  ${COLOR_YELLOW}5.${COLOR_RESET} ${LANG[MENU_5]}"
-    echo -e "  ${COLOR_YELLOW}6.${COLOR_RESET} ${LANG[MENU_6]}"
-    echo -e "  ${COLOR_YELLOW}7.${COLOR_RESET} ${LANG[MENU_7]}"
-    echo -e "  ${COLOR_YELLOW}8.${COLOR_RESET} ${LANG[MENU_8]}"
-    echo -e "  ${COLOR_YELLOW}9.${COLOR_RESET} ${LANG[MENU_9]}"
-    echo -e ""
-    echo -e "  ${COLOR_YELLOW}0.${COLOR_RESET} ${LANG[EXIT]}"
-    echo -e ""
+    local m1="${LANG[MENU_1]:-Install AURORA (Panel + Node)}"
+    local m2="${LANG[MENU_2]:-Install AURORA Panel only}"
+    local m3="${LANG[MENU_3]:-Install AURORA Node only}"
+    local m4="${LANG[MENU_4]:-Add node to existing panel}"
+    local m5="${LANG[MENU_5]:-Manage panel/node}"
+    local m6="${LANG[MENU_6]:-SSL Certificates}"
+    local m7="${LANG[MENU_7]:-Backup & Restore}"
+    local m8="${LANG[MENU_8]:-Update AURORA}"
+    local m9="${LANG[MENU_9]:-Remove AURORA}"
+    local m0="${LANG[EXIT]:-Exit}"
+
+    cat >&2 <<EOF
+
+${COLOR_CYAN}    ╔══════════════════════════════════╗
+    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║
+    ║     ${COLOR_WHITE}Unified Installer v${SCRIPT_VERSION}${COLOR_CYAN}   ║
+    ╚══════════════════════════════════╝${COLOR_RESET}
+
+${COLOR_GRAY}github.com/bychikola/aurora-vpn-panel${COLOR_RESET}
+
+  ${COLOR_YELLOW}1.${COLOR_RESET} ${m1}
+  ${COLOR_YELLOW}2.${COLOR_RESET} ${m2}
+  ${COLOR_YELLOW}3.${COLOR_RESET} ${m3}
+  ${COLOR_YELLOW}4.${COLOR_RESET} ${m4}
+  ${COLOR_YELLOW}5.${COLOR_RESET} ${m5}
+  ${COLOR_YELLOW}6.${COLOR_RESET} ${m6}
+  ${COLOR_YELLOW}7.${COLOR_RESET} ${m7}
+  ${COLOR_YELLOW}8.${COLOR_RESET} ${m8}
+  ${COLOR_YELLOW}9.${COLOR_RESET} ${m9}
+
+  ${COLOR_YELLOW}0.${COLOR_RESET} ${m0}
+
+EOF
 }
 
 install_aurora_panel_node() {
@@ -721,20 +737,35 @@ self_update() {
 # ═══════════════════════════════════════════════
 
 install_self() {
-    if [ ! -f "${INSTALL_DIR}/aurora_installer.sh" ]; then
-        mkdir -p "$INSTALL_DIR"
-        cp "$0" "${INSTALL_DIR}/aurora_installer.sh"
-        chmod +x "${INSTALL_DIR}/aurora_installer.sh"
-        ln -sf "${INSTALL_DIR}/aurora_installer.sh" /usr/local/bin/aurora
-
-        # Alias
-        local bashrc="/etc/bash.bashrc"
-        grep -q "alias aurora=" "$bashrc" 2>/dev/null || \
-            echo "alias aurora='aurora'" >> "$bashrc"
-
-        info "Installer saved to /usr/local/bin/aurora"
-        info "Run 'aurora' to open this menu again"
+    if [ -f "${INSTALL_DIR}/aurora_installer.sh" ] && [ -f "/usr/local/bin/aurora" ]; then
+        return 0
     fi
+
+    mkdir -p "$INSTALL_DIR"
+
+    # If running from pipe (curl|bash), $0 is "bash" — download from GitHub
+    if [ "$0" = "bash" ] || [ "$0" = "-bash" ] || ! [ -f "$0" ]; then
+        info "First run detected — downloading installer from GitHub..."
+        if ! download_file "$SCRIPT_URL" "${INSTALL_DIR}/aurora_installer.sh" "installer"; then
+            warning "Failed to download installer. You can still use the menu,"
+            warning "but run 'curl ... | bash' again after fixing connectivity."
+            # Create a minimal self so we don't crash
+            cp /proc/self/fd/0 "${INSTALL_DIR}/aurora_installer.sh" 2>/dev/null || true
+            [ -f "${INSTALL_DIR}/aurora_installer.sh" ] || return 1
+        fi
+    else
+        cp "$0" "${INSTALL_DIR}/aurora_installer.sh"
+    fi
+
+    chmod +x "${INSTALL_DIR}/aurora_installer.sh"
+    ln -sf "${INSTALL_DIR}/aurora_installer.sh" /usr/local/bin/aurora
+
+    # Alias
+    local bashrc="/etc/bash.bashrc"
+    grep -q "alias aurora=" "$bashrc" 2>/dev/null || \
+        echo "alias aurora='aurora'" >> "$bashrc"
+
+    success "Installer saved. Run 'aurora' to open this menu again."
 }
 
 # ═══════════════════════════════════════════════
