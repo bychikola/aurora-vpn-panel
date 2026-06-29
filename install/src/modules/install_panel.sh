@@ -14,7 +14,14 @@ _do_install_panel() {
 
     mkdir -p "$AURORA_DIR"/{configs,data/postgres,data/redis,ssl,build}
 
-    # ─── Clone repo if not present ───
+    # ─── Update or clone repo ───
+    if [ -d "$AURORA_DIR/repo/.git" ]; then
+        info "Updating repository to latest version..."
+        cd "$AURORA_DIR/repo" && git pull --ff-only origin master 2>&1 || {
+            warning "Git pull failed, re-cloning..."
+            rm -rf "$AURORA_DIR/repo"
+        }
+    fi
     if [ ! -d "$AURORA_DIR/repo/.git" ]; then
         info "Cloning AURORA repository..."
         git clone --depth 1 "$REPO_URL" "$AURORA_DIR/repo" 2>&1 || {
@@ -25,6 +32,7 @@ _do_install_panel() {
         }
         success "Repository cloned"
     fi
+    success "Repository ready (commit: $(cd "$AURORA_DIR/repo" && git rev-parse --short HEAD))"
 
     # ─── .env ───
     cat > "$AURORA_DIR/.env" <<EOF
@@ -297,7 +305,9 @@ YAML
     # ─── Build images (takes a few minutes first time) ───
     info "Building AURORA Docker images (this may take 3-5 minutes on first run)..."
     info "--- Build output below ---"
-    cd "$AURORA_DIR" && docker compose build --progress=plain 2>&1
+    # Clear Docker build cache to ensure fresh build with updated source files
+    docker builder prune -f --filter "until=1h" 2>/dev/null || true
+    cd "$AURORA_DIR" && docker compose build --no-cache --progress=plain 2>&1
     local build_exit=$?
     info "--- End of build output ---"
 
