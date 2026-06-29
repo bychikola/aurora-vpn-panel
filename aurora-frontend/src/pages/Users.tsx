@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Trash2, Edit3, Eye, EyeOff, QrCode } from 'lucide-react';
+import { Plus, Search, Trash2, Edit3, QrCode } from 'lucide-react';
 import { useUsers, useDeleteUser } from '../api/hooks';
 import { formatBytes, formatDate } from '../lib/utils';
 import type { User, UserFilters, Protocol } from '../types';

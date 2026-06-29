@@ -1,4 +1,4 @@
-import { Radio, Shield, Plug, ArrowUpDown } from 'lucide-react';
+import { Shield, Plug, ArrowUpDown } from 'lucide-react';
 import { useInbounds } from '../api/hooks';
 import { formatBytes } from '../lib/utils';
 import type { Inbound } from '../types';

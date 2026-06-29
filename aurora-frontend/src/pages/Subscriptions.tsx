@@ -1,4 +1,4 @@
-import { Copy, Key, Link2, QrCode } from 'lucide-react';
+import { Copy, Key, QrCode } from 'lucide-react';
 import { useSubscriptions } from '../api/hooks';
 import { formatDateTime } from '../lib/utils';
 

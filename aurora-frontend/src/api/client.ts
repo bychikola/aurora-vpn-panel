@@ -40,7 +40,8 @@ export async function fetchUsers(filters: UserFilters): Promise<PaginatedRespons
     filtered = filtered.filter((u) => u.status === filters.status);
   }
   if (filters.protocol && filters.protocol !== 'all') {
-    filtered = filtered.filter((u) => u.protocols.includes(filters.protocol));
+    const proto = filters.protocol;
+    filtered = filtered.filter((u) => u.protocols.includes(proto));
   }
 
   const total = filtered.length;

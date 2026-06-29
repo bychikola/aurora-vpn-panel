@@ -1,4 +1,4 @@
-import { Server, Cpu, HardDrive, MemoryStick, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Cpu, HardDrive, MemoryStick, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { useNodes } from '../api/hooks';
 import { formatBytes } from '../lib/utils';
 import type { Node } from '../types';

@@ -16,7 +16,7 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  sub?: string;
+  sub?: string | React.ReactNode;
   accent?: string;
 }) {
   return (
@@ -25,7 +25,7 @@ function StatCard({
       style={{ background: 'var(--color-polar-850)' }}
     >
       <div className="flex items-center gap-2 mb-1">
-        <Icon className="w-4 h-4" style={{ color: accent ?? 'var(--color-aurora-cyan)' }} />
+        <Icon className="w-4 h-4" />
         <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-frost)' }}>
           {label}
         </span>
@@ -34,9 +34,9 @@ function StatCard({
         {value}
       </span>
       {sub && (
-        <span className="text-xs mt-0.5" style={{ color: 'var(--color-ice)' }}>
+        <div className="text-xs mt-0.5" style={{ color: 'var(--color-ice)' }}>
           {sub}
-        </span>
+        </div>
       )}
     </div>
   );
@@ -61,12 +61,6 @@ function NodeStatusBar({ nodes }: { nodes: { status: string }[] }) {
       )}
     </div>
   );
-}
-
-function formatTrafficValue(value: number) {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)} GB/s`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB/s`;
-  return `${(value / 1_000).toFixed(0)} KB/s`;
 }
 
 export default function Dashboard() {
