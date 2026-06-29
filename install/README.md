@@ -5,13 +5,13 @@
 ## Быстрый старт
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/install_aurora.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/install_aurora.sh | bash
 ```
 
 Или с зеркалом:
 
 ```bash
-curl -fsSL https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@main/install/install_aurora.sh | bash
+curl -fsSL https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@master/install/install_aurora.sh | bash
 ```
 
 После установки скрипт доступен по команде:
@@ -73,7 +73,7 @@ install/
 
 ```bash
 # Установка за 5 минут
-bash <(curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/install_aurora.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/install_aurora.sh)
 # Выбрать пункт 1
 ```
 

@@ -1,7 +1,7 @@
 # AURORA VPN Panel
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/media/aurora-banner.png" alt="AURORA VPN Panel" width="600">
+  <img src="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/media/aurora-banner.png" alt="AURORA VPN Panel" width="600">
 </p>
 
 <p align="center">
@@ -24,13 +24,13 @@
 Одна команда на чистом VPS с Debian/Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/install_aurora.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/install_aurora.sh | bash
 ```
 
 **Зеркало (если GitHub недоступен):**
 
 ```bash
-curl -fsSL https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@main/install/install_aurora.sh | bash
+curl -fsSL https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@master/install/install_aurora.sh | bash
 ```
 
 После установки управление через меню:

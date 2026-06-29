@@ -7,9 +7,9 @@
 SCRIPT_VERSION="1.0.0"
 INSTALL_DIR="/usr/local/aurora"
 LANG_FILE="${INSTALL_DIR}/selected_language"
-SCRIPT_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/install_aurora.sh"
-LANG_BASE_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/src/lang"
-MODULE_BASE_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/main/install/src"
+SCRIPT_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/install_aurora.sh"
+LANG_BASE_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/src/lang"
+MODULE_BASE_URL="https://raw.githubusercontent.com/bychikola/aurora-vpn-panel/master/install/src"
 
 COLOR_RESET="\033[0m"
 COLOR_GREEN="\033[1;32m"
@@ -70,7 +70,7 @@ download_file() {
         curl -fsSL "$url" -o "$dest" 2>/dev/null && return 0
         # jsDelivr fallback
         local gh_path="${url#https://raw.githubusercontent.com/*/}"
-        local jsdelivr_url="https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@main/${gh_path#main/}"
+        local jsdelivr_url="https://cdn.jsdelivr.net/gh/bychikola/aurora-vpn-panel@master/${gh_path#master/}"
         curl -fsSL "$jsdelivr_url" -o "$dest" 2>/dev/null && return 0
     elif command -v wget &>/dev/null; then
         wget -q "$url" -O "$dest" 2>/dev/null && return 0
