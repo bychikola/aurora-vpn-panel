@@ -296,13 +296,16 @@ YAML
 
     # ─── Build images (takes a few minutes first time) ───
     info "Building AURORA Docker images (this may take 3-5 minutes on first run)..."
-    cd "$AURORA_DIR" && docker compose build --pull 2>&1 &
-    local build_pid=$!
-    spinner $build_pid "Building images..."
-    wait $build_pid
-    if [ $? -ne 0 ]; then
-        warning "Docker build had some issues. Attempting to continue..."
+    info "--- Build output below ---"
+    cd "$AURORA_DIR" && docker compose build --progress=plain 2>&1
+    local build_exit=$?
+    info "--- End of build output ---"
+
+    if [ $build_exit -ne 0 ]; then
+        echo -e ""
+        error "Docker build FAILED (exit code: $build_exit). Check output above for details."
     fi
+    success "All images built successfully"
 
     success "Panel configuration written to $AURORA_DIR/ (webserver: $WEBSERVER)"
 }
