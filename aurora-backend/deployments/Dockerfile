@@ -5,13 +5,14 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
-COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+# Copy go.mod first, then download (go.sum generated inside container)
+COPY go.mod ./
+RUN go mod download
 
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')" \
+    go build -ldflags="-s -w" \
     -o aurora ./cmd/aurora
 
 # ─── Run stage ───
