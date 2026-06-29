@@ -7,13 +7,27 @@ _do_install_panel() {
     local JWT_ACCESS="$3"
     local JWT_REFRESH="$4"
     local ADMIN_PASSWORD="$5"
-    local WEBSERVER="${6:-nginx}"  # nginx or caddy
+    local WEBSERVER="${6:-nginx}"
 
-    mkdir -p /opt/aurora/{configs,data/postgres,data/redis,ssl}
+    local AURORA_DIR="/opt/aurora"
+    local REPO_URL="https://github.com/bychikola/aurora-vpn-panel.git"
 
-    # Create .env file
-    cat > /opt/aurora/.env <<EOF
-# AURORA Panel Environment
+    mkdir -p "$AURORA_DIR"/{configs,data/postgres,data/redis,ssl,build}
+
+    # ─── Clone repo if not present ───
+    if [ ! -d "$AURORA_DIR/repo/.git" ]; then
+        info "Cloning AURORA repository..."
+        git clone --depth 1 "$REPO_URL" "$AURORA_DIR/repo" 2>&1 || {
+            warning "Git clone failed. Trying with https + GIT_SSL_NO_VERIFY..."
+            GIT_SSL_NO_VERIFY=true git clone --depth 1 "$REPO_URL" "$AURORA_DIR/repo" 2>&1 || {
+                error "Cannot clone repository. Check internet connection."
+            }
+        }
+        success "Repository cloned"
+    fi
+
+    # ─── .env ───
+    cat > "$AURORA_DIR/.env" <<EOF
 DB_PASSWORD=${DB_PASSWORD}
 AURORA_DATABASE_HOST=postgres
 AURORA_DATABASE_PORT=5432
@@ -29,8 +43,8 @@ AURORA_PANEL_DOMAIN=${PANEL_DOMAIN}
 AURORA_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 EOF
 
-    # Create config.yaml
-    cat > /opt/aurora/configs/config.yaml <<EOF
+    # ─── config.yaml ───
+    cat > "$AURORA_DIR/configs/config.yaml" <<EOF
 server:
   host: "0.0.0.0"
   port: 8080
@@ -71,21 +85,20 @@ log:
   format: "json"
 EOF
 
-    # Copy SSL certificates (for Nginx mode)
+    # ─── SSL certs for Nginx ───
     if [ "$WEBSERVER" = "nginx" ]; then
         local cert_dir="/etc/letsencrypt/live/${PANEL_DOMAIN}"
-        local base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
-        if [ ! -d "$cert_dir" ]; then
-            cert_dir="/etc/letsencrypt/live/${base_domain}"
-        fi
+        local base_domain
+        base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+        [ ! -d "$cert_dir" ] && cert_dir="/etc/letsencrypt/live/${base_domain}"
         if [ -d "$cert_dir" ]; then
-            cp "$cert_dir/fullchain.pem" /opt/aurora/ssl/fullchain.pem
-            cp "$cert_dir/privkey.pem" /opt/aurora/ssl/privkey.pem
+            cp "$cert_dir/fullchain.pem" "$AURORA_DIR/ssl/fullchain.pem"
+            cp "$cert_dir/privkey.pem" "$AURORA_DIR/ssl/privkey.pem"
         fi
     fi
 
-    # ─── Docker-compose ───
-    cat > /opt/aurora/docker-compose.yml <<YAML
+    # ─── docker-compose.yml ───
+    cat > "$AURORA_DIR/docker-compose.yml" <<YAML
 services:
   postgres:
     image: postgres:16-alpine
@@ -97,8 +110,6 @@ services:
       POSTGRES_PASSWORD: \${DB_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aurora"]
       interval: 5s
@@ -114,8 +125,6 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./data/redis:/data
-    ports:
-      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -125,15 +134,16 @@ services:
       - aurora-net
 
   backend:
-    image: ghcr.io/bychikola/aurora-backend:latest
+    build:
+      context: ./repo/aurora-backend
+      dockerfile: deployments/Dockerfile
+    image: aurora-backend:local
     container_name: aurora-backend
     restart: unless-stopped
     env_file:
       - .env
     volumes:
       - ./configs:/app/configs:ro
-    ports:
-      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,11 +153,23 @@ services:
       - aurora-net
 
   frontend:
-    image: ghcr.io/bychikola/aurora-frontend:latest
+    build:
+      context: ./repo/aurora-frontend
+      dockerfile_inline: |
+        FROM node:22-alpine AS builder
+        WORKDIR /app
+        COPY package.json package-lock.json ./
+        RUN npm ci
+        COPY . .
+        RUN npm run build
+
+        FROM nginx:alpine
+        COPY --from=builder /app/dist /usr/share/nginx/html
+        COPY nginx-frontend.conf /etc/nginx/conf.d/default.conf
+        EXPOSE 80
+    image: aurora-frontend:local
     container_name: aurora-frontend
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:80"
     depends_on:
       - backend
     networks:
@@ -155,9 +177,28 @@ services:
 
 YAML
 
-    # ─── Reverse proxy: Caddy or Nginx ───
+    # Frontend nginx config
+    cat > "$AURORA_DIR/repo/aurora-frontend/nginx-frontend.conf" <<'NGX'
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /api/ {
+        proxy_pass http://backend:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+NGX
+
+    # ─── Reverse proxy ───
     if [ "$WEBSERVER" = "caddy" ]; then
-        cat >> /opt/aurora/docker-compose.yml <<YAML
+        cat >> "$AURORA_DIR/docker-compose.yml" <<YAML
   caddy:
     image: caddy:2-alpine
     container_name: aurora-caddy
@@ -176,8 +217,7 @@ YAML
     networks:
       - aurora-net
 YAML
-
-        cat > /opt/aurora/Caddyfile <<EOF
+        cat > "$AURORA_DIR/Caddyfile" <<EOF
 ${PANEL_DOMAIN} {
     encode gzip zstd
     handle /api/* {
@@ -188,10 +228,8 @@ ${PANEL_DOMAIN} {
     }
 }
 EOF
-        info "Caddy configured — auto-SSL will obtain certificate on first request"
     else
-        # Nginx
-        cat >> /opt/aurora/docker-compose.yml <<YAML
+        cat >> "$AURORA_DIR/docker-compose.yml" <<YAML
   nginx:
     image: nginx:alpine
     container_name: aurora-nginx
@@ -208,8 +246,7 @@ EOF
     networks:
       - aurora-net
 YAML
-
-        cat > /opt/aurora/nginx.conf <<EOF
+        cat > "$AURORA_DIR/nginx.conf" <<EOF
 events { worker_connections 1024; }
 
 http {
@@ -222,7 +259,6 @@ http {
     server {
         listen 443 ssl http2;
         server_name ${PANEL_DOMAIN};
-
         ssl_certificate /etc/nginx/ssl/fullchain.pem;
         ssl_certificate_key /etc/nginx/ssl/privkey.pem;
         ssl_protocols TLSv1.2 TLSv1.3;
@@ -233,32 +269,40 @@ http {
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
         }
-
         location /api/ {
             proxy_pass http://backend:8080;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
         }
     }
 }
 EOF
 
-        # SSL renewal cron (only for Nginx)
-        local base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+        # SSL renewal cron
+        local base_domain
+        base_domain=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
         cat > /etc/cron.d/aurora-ssl <<EOF
-0 3 * * * root certbot renew --quiet --post-hook "cp /etc/letsencrypt/live/${base_domain}/fullchain.pem /opt/aurora/ssl/fullchain.pem && cp /etc/letsencrypt/live/${base_domain}/privkey.pem /opt/aurora/ssl/privkey.pem && cd /opt/aurora && docker compose restart nginx"
+0 3 * * * root certbot renew --quiet --post-hook "cp /etc/letsencrypt/live/${base_domain}/fullchain.pem $AURORA_DIR/ssl/fullchain.pem && cp /etc/letsencrypt/live/${base_domain}/privkey.pem $AURORA_DIR/ssl/privkey.pem && cd $AURORA_DIR && docker compose restart nginx"
 EOF
     fi
 
-    cat >> /opt/aurora/docker-compose.yml <<YAML
+    cat >> "$AURORA_DIR/docker-compose.yml" <<YAML
 networks:
   aurora-net:
     driver: bridge
 YAML
 
-    success "Panel configuration written to /opt/aurora/ (webserver: ${WEBSERVER})"
+    # ─── Build images (takes a few minutes first time) ───
+    info "Building AURORA Docker images (this may take 3-5 minutes on first run)..."
+    cd "$AURORA_DIR" && docker compose build --pull 2>&1 &
+    local build_pid=$!
+    spinner $build_pid "Building images..."
+    wait $build_pid
+    if [ $? -ne 0 ]; then
+        warning "Docker build had some issues. Attempting to continue..."
+    fi
+
+    success "Panel configuration written to $AURORA_DIR/ (webserver: $WEBSERVER)"
 }

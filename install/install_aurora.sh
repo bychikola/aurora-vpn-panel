@@ -516,14 +516,18 @@ install_aurora_panel_node() {
     _do_install_node "localhost" "10085" "localhost"
 
     info "${LANG[STARTING_SERVICES]}"
-    cd /opt/aurora && docker compose up -d 2>&1 &
-    spinner $! "${LANG[WAITING]}"
-    wait $!
+    cd /opt/aurora && docker compose up -d 2>&1 | tail -20
+    local up_exit=$?
 
     echo -e ""
-    success "${LANG[INSTALL_COMPLETE]}"
-    printf "${LANG[PANEL_ACCESS]}\n" "$PANEL_DOMAIN"
-    printf "${LANG[ADMIN_CREDENTIALS]}\n" "admin" "$ADMIN_PASSWORD"
+    if [ $up_exit -eq 0 ]; then
+        sleep 3
+        success "${LANG[INSTALL_COMPLETE]}"
+        printf "${LANG[PANEL_ACCESS]}\n" "$PANEL_DOMAIN"
+        printf "${LANG[ADMIN_CREDENTIALS]}\n" "admin" "$ADMIN_PASSWORD"
+    else
+        warning "Some containers may have failed. Check: cd /opt/aurora && docker compose logs"
+    fi
     echo -e ""
     reading "Press Enter to return to menu..." _
 }
@@ -567,14 +571,22 @@ install_aurora_panel() {
     _do_install_panel "$PANEL_DOMAIN" "$DB_PASSWORD" "$JWT_ACCESS" "$JWT_REFRESH" "$ADMIN_PASSWORD" "$USE_WEBSERVER"
 
     info "${LANG[STARTING_SERVICES]}"
-    cd /opt/aurora && docker compose up -d 2>&1 &
-    spinner $! "${LANG[WAITING]}"
-    wait $!
+    cd /opt/aurora && docker compose up -d 2>&1 | tail -20
+    local up_exit=$?
 
     echo -e ""
-    success "${LANG[INSTALL_COMPLETE]}"
-    printf "${LANG[PANEL_ACCESS]}\n" "$PANEL_DOMAIN"
-    printf "${LANG[ADMIN_CREDENTIALS]}\n" "admin" "$ADMIN_PASSWORD"
+    if [ $up_exit -eq 0 ]; then
+        # Verify containers are running
+        sleep 3
+        local running
+        running=$(docker compose ps --format json 2>/dev/null | grep -c '"Health":"healthy"' || echo 0)
+        success "${LANG[INSTALL_COMPLETE]}"
+        printf "${LANG[PANEL_ACCESS]}\n" "$PANEL_DOMAIN"
+        printf "${LANG[ADMIN_CREDENTIALS]}\n" "admin" "$ADMIN_PASSWORD"
+    else
+        warning "Some containers may have failed to start."
+        warning "Check logs: cd /opt/aurora && docker compose logs"
+    fi
     echo -e ""
     reading "Press Enter to return to menu..." _
 }
