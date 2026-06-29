@@ -11,13 +11,12 @@ import { formatBytes, formatDate } from '../lib/utils';
 const AURORA_COLORS = ['#7bf2a8', '#5eeadb', '#b98eff', '#60a5fa', '#f472b6', '#fbbf24', '#94a3b8'];
 
 function StatCard({
-  icon: Icon, label, value, sub, accent,
+  icon: Icon, label, value, sub,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   sub?: string | React.ReactNode;
-  accent?: string;
 }) {
   return (
     <div
@@ -104,7 +103,6 @@ export default function Dashboard() {
           label="Total Users"
           value={String(stats.totalUsers)}
           sub={`${stats.activeUsers} active`}
-          accent="var(--color-aurora-green)"
         />
         <StatCard
           icon={Server}
