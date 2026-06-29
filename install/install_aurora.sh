@@ -171,21 +171,18 @@ _set_fallback_en() {
 
 show_language_menu() {
     clear
-    cat >&2 <<EOF
-
-${COLOR_CYAN}    ╔══════════════════════════════════╗
-    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║
-    ║     ${COLOR_WHITE}Unified Installer${COLOR_CYAN}           ║
-    ╚══════════════════════════════════╝${COLOR_RESET}
-
-${COLOR_GREEN}${LANG[CHOOSE_LANG]}${COLOR_RESET}
-
-    ${COLOR_YELLOW}1. ${COLOR_WHITE}English${COLOR_RESET}
-    ${COLOR_YELLOW}2. ${COLOR_WHITE}Русский${COLOR_RESET}
-
-EOF
+    echo -e ""
+    echo -e "${COLOR_CYAN}    ╔══════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ║     ${COLOR_WHITE}Unified Installer${COLOR_CYAN}           ║${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ╚══════════════════════════════════╝${COLOR_RESET}"
+    echo -e ""
+    echo -e "${COLOR_GREEN}${LANG[CHOOSE_LANG]}${COLOR_RESET}"
+    echo -e ""
+    echo -e "    ${COLOR_YELLOW}1. ${COLOR_WHITE}English${COLOR_RESET}"
+    echo -e "    ${COLOR_YELLOW}2. ${COLOR_WHITE}Русский${COLOR_RESET}"
+    echo -e ""
     reading "Select (1-2): " LANG_CHOICE
-    echo "$LANG_CHOICE" >&2
 
     case $LANG_CHOICE in
         1) echo "1" > "$LANG_FILE"; set_language en ;;
@@ -384,28 +381,26 @@ show_menu() {
     local m9="${LANG[MENU_9]:-Remove AURORA}"
     local m0="${LANG[EXIT]:-Exit}"
 
-    cat >&2 <<EOF
-
-${COLOR_CYAN}    ╔══════════════════════════════════╗
-    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║
-    ║     ${COLOR_WHITE}Unified Installer v${SCRIPT_VERSION}${COLOR_CYAN}   ║
-    ╚══════════════════════════════════╝${COLOR_RESET}
-
-${COLOR_GRAY}github.com/bychikola/aurora-vpn-panel${COLOR_RESET}
-
-  ${COLOR_YELLOW}1.${COLOR_RESET} ${m1}
-  ${COLOR_YELLOW}2.${COLOR_RESET} ${m2}
-  ${COLOR_YELLOW}3.${COLOR_RESET} ${m3}
-  ${COLOR_YELLOW}4.${COLOR_RESET} ${m4}
-  ${COLOR_YELLOW}5.${COLOR_RESET} ${m5}
-  ${COLOR_YELLOW}6.${COLOR_RESET} ${m6}
-  ${COLOR_YELLOW}7.${COLOR_RESET} ${m7}
-  ${COLOR_YELLOW}8.${COLOR_RESET} ${m8}
-  ${COLOR_YELLOW}9.${COLOR_RESET} ${m9}
-
-  ${COLOR_YELLOW}0.${COLOR_RESET} ${m0}
-
-EOF
+    echo -e ""
+    echo -e "${COLOR_CYAN}    ╔══════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ║     ${COLOR_GREEN}AURORA VPN Panel${COLOR_CYAN}           ║${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ║     ${COLOR_WHITE}Unified Installer v${SCRIPT_VERSION}${COLOR_CYAN}   ║${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}    ╚══════════════════════════════════╝${COLOR_RESET}"
+    echo -e ""
+    echo -e "${COLOR_GRAY}github.com/bychikola/aurora-vpn-panel${COLOR_RESET}"
+    echo -e ""
+    echo -e "  ${COLOR_YELLOW}1.${COLOR_RESET} ${m1}"
+    echo -e "  ${COLOR_YELLOW}2.${COLOR_RESET} ${m2}"
+    echo -e "  ${COLOR_YELLOW}3.${COLOR_RESET} ${m3}"
+    echo -e "  ${COLOR_YELLOW}4.${COLOR_RESET} ${m4}"
+    echo -e "  ${COLOR_YELLOW}5.${COLOR_RESET} ${m5}"
+    echo -e "  ${COLOR_YELLOW}6.${COLOR_RESET} ${m6}"
+    echo -e "  ${COLOR_YELLOW}7.${COLOR_RESET} ${m7}"
+    echo -e "  ${COLOR_YELLOW}8.${COLOR_RESET} ${m8}"
+    echo -e "  ${COLOR_YELLOW}9.${COLOR_RESET} ${m9}"
+    echo -e ""
+    echo -e "  ${COLOR_YELLOW}0.${COLOR_RESET} ${m0}"
+    echo -e ""
 }
 
 install_aurora_panel_node() {
