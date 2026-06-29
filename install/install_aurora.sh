@@ -220,7 +220,7 @@ install_dependencies() {
     apt-get update -y -qq >/dev/null 2>&1
     apt-get install -y -qq ca-certificates curl jq wget gnupg ufw \
         dnsutils git cron certbot python3-certbot-dns-cloudflare \
-        unattended-upgrades >/dev/null 2>&1
+        unattended-upgrades netcat-openbsd >/dev/null 2>&1
 
     # Docker
     if ! command -v docker &>/dev/null; then
@@ -230,10 +230,24 @@ install_dependencies() {
         systemctl enable docker >/dev/null 2>&1
     fi
 
-    # UFW
+    # UFW — open required ports
     ufw allow 22/tcp comment 'SSH' >/dev/null 2>&1
+    ufw allow 80/tcp comment 'HTTP' >/dev/null 2>&1
     ufw allow 443/tcp comment 'HTTPS' >/dev/null 2>&1
     ufw --force enable >/dev/null 2>&1
+
+    # Also ensure iptables accepts 80/443 (some providers have both)
+    iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || \
+        iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || \
+        iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || \
+        iptables -I INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || true
+    # Save iptables rules (persist across reboots)
+    command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
+    command -v iptables-save >/dev/null 2>&1 && iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+
+    success "Firewall configured: SSH(22) + HTTP(80) + HTTPS(443) open"
 
     # BBR
     if ! grep -q "net.core.default_qdisc = fq" /etc/sysctl.conf 2>/dev/null; then
